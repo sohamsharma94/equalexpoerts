@@ -185,7 +185,25 @@ Please include instructions about your strategy and important decisions you made
 
 ## Your Approach and answers to follow-up questions 
 
-_Please provide an explaination to your implementation approach and the additional questions **here**_
+### Implementation approach and assumptions
+
+Ingestion reads the newline-delimited JSON directly into DuckDB, casts the source fields to warehouse types, and merges rows into `blog_analysis.votes` by vote ID in a transaction. The ID is the primary key, so a rerun inserts new votes and replaces changed values for existing IDs without exposing duplicates. If one file contains the same ID more than once, the staged row with the latest `CreationDate` is used; remaining ties are resolved by the other vote fields.
+
+The outlier view first counts votes in seven-day calendar buckets starting on January 1 (week 0), matching the supplied example. It compares each observed bucket with the average count across observed buckets in the complete table, using the specified strict 20% threshold. Empty weeks are not included in that average. The script recreates the view and prints its rows in year/week order.
+
+### Follow-up questions
+
+1. **Production data quality:** Validate required fields and types before loading; reject or quarantine malformed rows; check non-null and unique IDs, valid timestamps, and reasonable vote-type values; record row counts and rejected records; monitor freshness and volume changes; and reconcile staged versus inserted/updated counts. Keep ingestion atomic so a failed batch does not leave partial updates.
+2. **Scaling to 10 TB with 5 GB arriving daily:** Store data in partitioned columnar files such as Parquet in object storage, and use an engine/catalog designed for distributed incremental processing. Partition appropriately (for example, by date), process only new or changed partitions, and avoid repeatedly scanning the full history. Use a durable change key/manifest or CDC feed for incremental merges, compact small files, and maintain statistics and monitoring. Keep the analytical query over a materialized weekly aggregate that is incrementally maintained, rather than recounting all raw rows daily.
+3. **Assumptions:** Vote IDs uniquely identify records; timestamps are valid and interpreted as the provided local/UTC-naive timestamp; the latest `CreationDate` is the best available tie-breaker for repeated IDs in one input file; a week means a fixed seven-day bucket beginning January 1 of each year; only weeks with at least one vote participate in the average; and rerunning a file should be idempotent.
+
+### AI tool usage
+
+1. **Specific use cases:** AI assistance was used to interpret the exercise instructions, draft the ingestion and SQL-view implementation, add tests, and update this README.
+2. **Estimated AI-generated code:** Approximately 80% of the new implementation and tests were AI-drafted; this estimate excludes the pre-existing project files.
+3. **Review and verification:** The implementation was checked against the sample output and the incremental/update/idempotency requirements with automated tests and the repository's exercise checks. Any remaining failing check or setup limitation is reported with the submission rather than represented as verified.
+
+The follow-up responses above are an implementation-oriented draft and should be reviewed and rephrased to reflect the submitter's own reasoning before submission.
 
 ## AI Tool Usage
 
